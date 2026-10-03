@@ -8,6 +8,11 @@ type Props = {
 };
 
 export default function PastePanel({ text, onTextChange, onLoadSample, onBuild, building, status }: Props) {
+  // Reads a WhatsApp "Export chat" .txt file into the text box.
+  async function upload(file: File | undefined) {
+    if (file) onTextChange(await file.text());
+  }
+
   return (
     <section className="rounded-lg bg-paper p-4 shadow-sm">
       <label htmlFor="chat" className="mb-2 block font-medium">
@@ -30,6 +35,19 @@ export default function PastePanel({ text, onTextChange, onLoadSample, onBuild, 
         >
           Load sample chat
         </button>
+        <label className="cursor-pointer rounded border border-ink px-4 py-2 focus-within:outline-2">
+          Upload chat export
+          <input
+            type="file"
+            accept=".txt,text/plain"
+            disabled={building}
+            onChange={(e) => {
+              upload(e.target.files?.[0]);
+              e.target.value = ""; // so the same file can be picked again
+            }}
+            className="sr-only"
+          />
+        </label>
         <button
           type="button"
           onClick={onBuild}

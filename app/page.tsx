@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 import MessageList, { type ReadState } from "@/components/MessageList";
 import OrderSheet from "@/components/OrderSheet";
 import PastePanel from "@/components/PastePanel";
@@ -11,17 +11,24 @@ import { parseChat, type ChatMessage } from "@/lib/parseChat";
 import { SAMPLE_CHAT } from "@/lib/sampleChat";
 import type { ParseResult } from "@/lib/schema";
 
-type State = {
+// What gets saved in the browser, so a refresh doesn't lose the order.
+type Saved = {
   text: string;
   messages: ChatMessage[];
   reads: Record<string, ReadState>;
-  building: boolean;
-  hint: string | null;
   fixes: Record<string, number>; // quantities the organiser typed, by entry id
   priceTexts: Record<string, string>; // price boxes, by order-sheet row
 };
 
+type State = Saved & {
+  building: boolean;
+  hint: string | null;
+  restored: boolean; // true once we've checked the browser for saved work
+};
+
 type Action =
+  | { type: "restore"; saved: Saved | null }
+  | { type: "reset" }
   | { type: "setText"; text: string }
   | { type: "start"; messages: ChatMessage[]; hint: string | null }
   | { type: "read"; id: string; read: ReadState }
@@ -29,15 +36,40 @@ type Action =
   | { type: "fix"; entryId: string; quantity: number | null }
   | { type: "price"; key: string; text: string };
 
+const START_HINT = "Paste a chat or load the sample to start.";
+const SAVE_KEY = "buy-together-v1";
+// Each message is one Gemma request (~1 per second), so very long exports are capped.
+const MAX_MESSAGES = 60;
+
+const EMPTY: State = {
+  text: "",
+  messages: [],
+  reads: {},
+  fixes: {},
+  priceTexts: {},
+  building: false,
+  hint: START_HINT,
+  restored: false,
+};
+
 // Drops fixes for one message's entries (ids look like "m3-0", "m3-1").
 function withoutFixesFor(fixes: Record<string, number>, messageId: string) {
   return Object.fromEntries(Object.entries(fixes).filter(([id]) => !id.startsWith(`${messageId}-`)));
 }
 
-const START_HINT = "Paste a chat or load the sample to start.";
-
 function reducer(state: State, action: Action): State {
   switch (action.type) {
+    case "restore": {
+      if (!action.saved) return { ...state, restored: true };
+      // A read that was in progress when the page closed has to be retried.
+      const reads: Record<string, ReadState> = {};
+      for (const [id, read] of Object.entries(action.saved.reads)) {
+        reads[id] = read.status === "reading" ? { status: "failed", error: "Interrupted. Retry." } : read;
+      }
+      return { ...state, ...action.saved, reads, hint: action.saved.messages.length ? null : START_HINT, restored: true };
+    }
+    case "reset":
+      return { ...EMPTY, restored: true };
     case "setText":
       return { ...state, text: action.text };
     case "start":
@@ -68,6 +100,23 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+// Reads saved work from the browser. Anything unexpected counts as "nothing saved".
+function loadSaved(): Saved | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? "null");
+    if (!saved || !Array.isArray(saved.messages)) return null;
+    return {
+      text: String(saved.text ?? ""),
+      messages: saved.messages,
+      reads: saved.reads ?? {},
+      fixes: saved.fixes ?? {},
+      priceTexts: saved.priceTexts ?? {},
+    };
+  } catch {
+    return null;
+  }
+}
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Sends one message to our server. Retries once, after 2 s, on a rate limit or network error.
@@ -95,15 +144,23 @@ async function requestParse(text: string, canRetry = true): Promise<ReadState> {
 }
 
 export default function Home() {
-  const [state, dispatch] = useReducer(reducer, {
-    text: "",
-    messages: [],
-    reads: {},
-    building: false,
-    hint: START_HINT,
-    fixes: {},
-    priceTexts: {},
-  });
+  const [state, dispatch] = useReducer(reducer, EMPTY);
+
+  // On first load, bring back any saved work. (localStorage only exists in the browser.)
+  useEffect(() => {
+    dispatch({ type: "restore", saved: loadSaved() });
+  }, []);
+
+  // Save after every change, once the restore above has happened.
+  const { restored, text, messages, reads, fixes, priceTexts } = state;
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ text, messages, reads, fixes, priceTexts }));
+    } catch {
+      // Private browsing or storage full: the app still works, it just won't remember.
+    }
+  }, [restored, text, messages, reads, fixes, priceTexts]);
 
   async function readOne(message: ChatMessage) {
     dispatch({ type: "read", id: message.id, read: { status: "reading" } });
@@ -111,7 +168,7 @@ export default function Home() {
   }
 
   async function buildOrder() {
-    const messages = parseChat(state.text);
+    let messages = parseChat(state.text);
     if (messages.length === 0) {
       const hint = state.text.trim()
         ? 'Couldn\'t find any messages. Each one should look like "Rahul: 2 pens".'
@@ -119,7 +176,12 @@ export default function Home() {
       dispatch({ type: "start", messages, hint });
       return;
     }
-    dispatch({ type: "start", messages, hint: null });
+    let hint: string | null = null;
+    if (messages.length > MAX_MESSAGES) {
+      hint = `This chat has ${messages.length} messages, so only the latest ${MAX_MESSAGES} are read. To read others, paste just that part of the chat.`;
+      messages = messages.slice(-MAX_MESSAGES);
+    }
+    dispatch({ type: "start", messages, hint });
 
     // Two messages at a time, each in its own fresh Gemma request.
     let next = 0;
@@ -130,6 +192,10 @@ export default function Home() {
     }
     await Promise.all([worker(), worker()]);
     dispatch({ type: "finish" });
+  }
+
+  function startOver() {
+    if (window.confirm("Clear the chat, the order, and all prices?")) dispatch({ type: "reset" });
   }
 
   // Everything below is recalculated from the reads: plain code, no AI.
@@ -145,15 +211,23 @@ export default function Home() {
   const total = state.messages.length;
   const finished = Object.values(state.reads).filter((r) => r.status !== "reading").length;
   const failed = Object.values(state.reads).filter((r) => r.status === "failed").length;
-  let status = state.hint;
-  if (state.building) status = `Reading message ${Math.min(finished + 1, total)} of ${total}`;
-  else if (total > 0) status = `Read ${total} messages.` + (failed ? ` ${failed} couldn't be read: retry them below.` : "");
+  let progress: string | null = null;
+  if (state.building) progress = `Reading message ${Math.min(finished + 1, total)} of ${total}.`;
+  else if (total > 0) progress = `Read ${total} messages.` + (failed ? ` ${failed} couldn't be read: retry them below.` : "");
+  const status = [progress, state.hint].filter(Boolean).join(" ") || null;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Buy Together</h1>
-        <p>Paste your group chat. Get one clean order.</p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Buy Together</h1>
+          <p>Paste your group chat. Get one clean order.</p>
+        </div>
+        {(state.text || total > 0) && !state.building && (
+          <button type="button" onClick={startOver} className="shrink-0 text-sm underline">
+            Start over
+          </button>
+        )}
       </header>
 
       <PastePanel

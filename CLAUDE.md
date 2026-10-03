@@ -344,6 +344,11 @@ Aman: ₹230
 Karan: ₹110
 ```
 
+**Decided at the event:**
+- The shop text leaves out rows with no known quantity (the shop can't fill "× ?"). After copying, the app says how many were left out.
+- Only the latest 60 messages of a chat are read (each one is a Gemma request, about 1 per second). The app explains this when it happens.
+- Work is saved in `localStorage` (`buy-together-v1`). "Start over" clears it.
+
 **Empty and error states tell the user what to do next:**
 - "Paste a chat or load the sample to start."
 - "Couldn't read this message. Retry or add it by hand."
