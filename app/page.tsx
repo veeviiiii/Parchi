@@ -4,7 +4,9 @@ import { useMemo, useReducer } from "react";
 import MessageList, { type ReadState } from "@/components/MessageList";
 import OrderSheet from "@/components/OrderSheet";
 import PastePanel from "@/components/PastePanel";
+import Summary from "@/components/Summary";
 import { aggregate } from "@/lib/aggregate";
+import { parsePrices } from "@/lib/money";
 import { parseChat, type ChatMessage } from "@/lib/parseChat";
 import { SAMPLE_CHAT } from "@/lib/sampleChat";
 import type { ParseResult } from "@/lib/schema";
@@ -15,13 +17,22 @@ type State = {
   reads: Record<string, ReadState>;
   building: boolean;
   hint: string | null;
+  fixes: Record<string, number>; // quantities the organiser typed, by entry id
+  priceTexts: Record<string, string>; // price boxes, by order-sheet row
 };
 
 type Action =
   | { type: "setText"; text: string }
   | { type: "start"; messages: ChatMessage[]; hint: string | null }
   | { type: "read"; id: string; read: ReadState }
-  | { type: "finish" };
+  | { type: "finish" }
+  | { type: "fix"; entryId: string; quantity: number | null }
+  | { type: "price"; key: string; text: string };
+
+// Drops fixes for one message's entries (ids look like "m3-0", "m3-1").
+function withoutFixesFor(fixes: Record<string, number>, messageId: string) {
+  return Object.fromEntries(Object.entries(fixes).filter(([id]) => !id.startsWith(`${messageId}-`)));
+}
 
 const START_HINT = "Paste a chat or load the sample to start.";
 
@@ -30,11 +41,30 @@ function reducer(state: State, action: Action): State {
     case "setText":
       return { ...state, text: action.text };
     case "start":
-      return { ...state, messages: action.messages, reads: {}, building: action.messages.length > 0, hint: action.hint };
-    case "read":
-      return { ...state, reads: { ...state.reads, [action.id]: action.read } };
+      // New messages get new ids, so old fixes no longer apply. Prices stay: they're per item.
+      return {
+        ...state,
+        messages: action.messages,
+        reads: {},
+        building: action.messages.length > 0,
+        hint: action.hint,
+        fixes: {},
+      };
+    case "read": {
+      // Re-reading a message (Retry) may give different items, so forget its fixes.
+      const fixes = action.read.status === "reading" ? withoutFixesFor(state.fixes, action.id) : state.fixes;
+      return { ...state, reads: { ...state.reads, [action.id]: action.read }, fixes };
+    }
     case "finish":
       return { ...state, building: false };
+    case "fix": {
+      const fixes = { ...state.fixes };
+      if (action.quantity === null) delete fixes[action.entryId];
+      else fixes[action.entryId] = action.quantity;
+      return { ...state, fixes };
+    }
+    case "price":
+      return { ...state, priceTexts: { ...state.priceTexts, [action.key]: action.text } };
   }
 }
 
@@ -71,6 +101,8 @@ export default function Home() {
     reads: {},
     building: false,
     hint: START_HINT,
+    fixes: {},
+    priceTexts: {},
   });
 
   async function readOne(message: ChatMessage) {
@@ -106,8 +138,9 @@ export default function Home() {
     for (const [id, read] of Object.entries(state.reads)) {
       if (read.status === "done") results[id] = read.result;
     }
-    return aggregate(state.messages, results);
-  }, [state.messages, state.reads]);
+    return aggregate(state.messages, results, state.fixes);
+  }, [state.messages, state.reads, state.fixes]);
+  const prices = useMemo(() => parsePrices(state.priceTexts), [state.priceTexts]);
 
   const total = state.messages.length;
   const finished = Object.values(state.reads).filter((r) => r.status !== "reading").length;
@@ -135,7 +168,15 @@ export default function Home() {
       {total > 0 && (
         <>
           <MessageList messages={state.messages} reads={state.reads} order={order} onRetry={readOne} />
-          <OrderSheet groups={order.groups} building={state.building} />
+          <OrderSheet
+            groups={order.groups}
+            building={state.building}
+            prices={prices}
+            priceTexts={state.priceTexts}
+            onPriceChange={(key, text) => dispatch({ type: "price", key, text })}
+            onFix={(entryId, quantity) => dispatch({ type: "fix", entryId, quantity })}
+          />
+          {order.groups.length > 0 && <Summary groups={order.groups} prices={prices} />}
         </>
       )}
     </main>
