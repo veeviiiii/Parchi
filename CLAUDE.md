@@ -298,6 +298,7 @@ Process results in chat order:
   - total quantity (non-null quantities only)
   - a list of `{ sender, quantity, source, messageId }`
   - a `flagged` boolean, true if any entry has a null quantity or an `unclear` note
+- A note belongs to the items it mentions ("How many pens?" → pen). A note that mentions none of the message's items belongs to all of them. A quantity the organiser types clears that entry's flag.
 
 **Money (`lib/money.ts`):**
 - Line total = total quantity × unit price.
