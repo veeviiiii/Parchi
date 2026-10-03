@@ -11,12 +11,97 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-hind), system-ui, sans-serif;
+  --font-hand: var(--font-kalam), cursive;
 }
 
 body {
   background: #eef2f7;
   color: #1e2a55;
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-hind), system-ui, sans-serif;
+}
+
+/* Keyboard focus is always visible. */
+:focus-visible {
+  outline: 2px solid #1e2a55;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+  The order sheet: a page from a single-line school notebook ("copy").
+  Faint blue ruled lines every --rule, a red margin line at --margin.
+  Every line of text inside is exactly one rule tall, so text sits on the lines.
+*/
+.notebook {
+  --rule: 2.5rem;
+  --margin: 2.75rem;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(
+      to right,
+      transparent calc(var(--margin) - 2px),
+      #d64545 calc(var(--margin) - 2px),
+      #d64545 var(--margin),
+      transparent var(--margin)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--rule) - 1px),
+      #bcd0ea calc(var(--rule) - 1px) var(--rule)
+    );
+  line-height: var(--rule);
+}
+
+/* Beats Tailwind's text-size line heights, so nothing breaks the rhythm. */
+.notebook * {
+  line-height: var(--rule);
+}
+
+/* Exactly one rule tall and top-aligned, so inputs never push the lines apart.
+   Their underline lands on the notebook's ruled line, like a blank to write in. */
+.notebook input {
+  line-height: normal;
+  height: var(--rule);
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.notebook input::-webkit-inner-spin-button,
+.notebook input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Text that starts right of the red margin line. */
+.notebook-line {
+  padding-left: calc(var(--margin) + 0.75rem);
+  padding-right: 1rem;
+}
+
+/* Row number written in the margin, like numbering a list in a copy. */
+.notebook-number {
+  position: absolute;
+  left: 0;
+  width: calc(var(--margin) - 0.5rem);
+  text-align: right;
+}
+
+/* A yellow highlighter stroke over text, for anything that needs a check. */
+.highlighter {
+  background-color: #ffeb6b;
+  border-radius: 0.25em 0.6em 0.3em 0.7em / 0.6em 0.3em 0.7em 0.35em;
+  padding: 0.05em 0.3em;
+  margin: 0 -0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }

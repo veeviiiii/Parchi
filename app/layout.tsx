@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Hind, Kalam } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Both by Indian Type Foundry, both with Devanagari (CLAUDE.md section 13).
+// Hind for all UI text.
+const hind = Hind({
+  variable: "--font-hind",
+  subsets: ["latin", "devanagari"],
+  weight: ["400", "500", "600"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Kalam (handwriting) only for item names on the order sheet.
+const kalam = Kalam({
+  variable: "--font-kalam",
+  subsets: ["latin", "devanagari"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -19,11 +24,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${hind.variable} ${kalam.variable} h-full antialiased`}>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

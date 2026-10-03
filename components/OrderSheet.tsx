@@ -22,30 +22,63 @@ function quantityLabel(group: OrderGroup): string {
 // unknown quantities, ones they already fixed, and ones with a note.
 const needsInput = (entry: Entry) => entry.quantity === null || entry.fixed || entry.flagged;
 
-// One row per item: quantity, unit price, line total.
+// A blank to write in, like "₹ ____ each" in a copy.
+const blankInput =
+  "rounded-none border-0 border-b-2 border-ink/40 bg-transparent px-1 text-base focus:border-ink [appearance:textfield]";
+
+// The order sheet: a page from a single-line school notebook (CLAUDE.md section 13).
 export default function OrderSheet({ groups, building, prices, priceTexts, onPriceChange, onFix }: Props) {
   return (
-    <section className="rounded-lg bg-paper p-4 shadow-sm">
-      <h2 className="mb-3 font-medium">Order sheet</h2>
+    <section className="notebook overflow-hidden rounded-sm shadow-sm" aria-labelledby="order-sheet">
+      <h2 id="order-sheet" className="notebook-line font-semibold">
+        Order sheet
+      </h2>
+
       {groups.length === 0 ? (
-        <p className="text-sm">{building ? "Items appear here as messages are read." : "No items in this chat yet."}</p>
+        <>
+          <p className="notebook-line font-hand text-xl opacity-75">
+            {building ? "Writing items here as messages are read…" : "Your order will be written here."}
+          </p>
+          <div className="h-[calc(var(--rule)*2)]" aria-hidden />
+        </>
       ) : (
-        <ul className="divide-y divide-rule">
-          {groups.map((group) => {
+        <ol>
+          {groups.map((group, index) => {
             const label = itemLabel(group.name, group.variant);
             return (
-              <li key={group.key} className={`space-y-2 px-2 py-3 ${group.flagged ? "bg-highlight" : ""}`}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-lg">{label}</span>
-                  <span className="shrink-0">× {quantityLabel(group)}</span>
-                </div>
+              <li key={group.key} className="notebook-line relative">
+                <span className="notebook-number font-hand text-lg" aria-hidden>
+                  {index + 1}.
+                </span>
+
+                {/* Tap the item line to see who asked and their exact words. */}
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
+                    <span className="font-hand text-xl">
+                      {group.flagged ? <mark className="highlighter text-ink">{label}</mark> : label}
+                    </span>
+                    <span className="shrink-0 font-hand text-xl">
+                      × {quantityLabel(group)}
+                      <span className="ml-2 inline-block align-top text-sm opacity-75 group-open:rotate-90" aria-hidden>
+                        ▸
+                      </span>
+                    </span>
+                  </summary>
+                  <ul className="text-sm">
+                    {group.entries.map((entry) => (
+                      <li key={entry.id}>
+                        <span className="font-medium">{entry.sender}</span> × {entry.quantity ?? "?"}{" "}
+                        <span className="opacity-75">“{entry.source}”</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
 
                 {group.entries.filter(needsInput).map((entry) => (
                   <div key={entry.id} className="text-sm">
-                    <label className="flex flex-wrap items-center gap-2">
-                      <span>
-                        {entry.sender} said “{entry.source}”. How many?
-                      </span>
+                    <label>
+                      {entry.sender}: “{entry.source}”{" "}
+                      {entry.fixed ? "→" : <span className="highlighter">How many?</span>}{" "}
                       <input
                         type="number"
                         min={0}
@@ -59,16 +92,20 @@ export default function OrderSheet({ groups, building, prices, priceTexts, onPri
                           }
                         }}
                         aria-label={`Quantity of ${label} for ${entry.sender}`}
-                        className="w-16 rounded border border-ink bg-paper px-2 py-1"
+                        className={`w-14 ${blankInput}`}
                       />
                     </label>
-                    {!entry.fixed && entry.notes.map((note, i) => <p key={i}>⚠ {note}</p>)}
+                    {/* "How many?" is already asked above, so only other notes are shown here. */}
+                    {!entry.fixed &&
+                      entry.notes
+                        .filter((note) => !/how many/i.test(note))
+                        .map((note, i) => <p key={i}>⚠ {note}</p>)}
                   </div>
                 ))}
 
-                <div className="flex items-center justify-between gap-2">
-                  <label className="flex items-center gap-1 text-sm">
-                    ₹
+                <div className="flex items-start justify-between gap-3">
+                  <label className="text-sm">
+                    ₹{" "}
                     <input
                       type="number"
                       min={0}
@@ -76,33 +113,23 @@ export default function OrderSheet({ groups, building, prices, priceTexts, onPri
                       inputMode="decimal"
                       value={priceTexts[group.key] ?? ""}
                       onChange={(e) => onPriceChange(group.key, e.target.value)}
-                      placeholder="price"
                       aria-label={`Price of one ${label}, in rupees`}
-                      className="w-20 rounded border border-rule bg-paper px-2 py-1"
-                    />
+                      className={`w-20 ${blankInput}`}
+                    />{" "}
                     each
                   </label>
                   <span className="font-medium">
-                    {group.key in prices ? formatRupees(lineTotal(group, prices)) : "—"}
+                    {group.key in prices ? formatRupees(lineTotal(group, prices)) : <span className="text-sm font-normal opacity-75">no price</span>}
                   </span>
                 </div>
-
-                <details className="text-sm">
-                  <summary className="cursor-pointer opacity-75">Who asked ({group.entries.length})</summary>
-                  <ul className="mt-1 space-y-1">
-                    {group.entries.map((entry) => (
-                      <li key={entry.id}>
-                        <span className="font-medium">{entry.sender}</span> × {entry.quantity ?? "?"}{" "}
-                        <span className="opacity-75">“{entry.source}”</span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
               </li>
             );
           })}
-        </ul>
+        </ol>
       )}
+
+      {/* One blank ruled line at the bottom of the page. */}
+      <div className="h-(--rule)" aria-hidden />
     </section>
   );
 }

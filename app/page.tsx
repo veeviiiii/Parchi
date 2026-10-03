@@ -217,31 +217,36 @@ export default function Home() {
   const status = [progress, state.hint].filter(Boolean).join(" ") || null;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-6">
-      <header className="flex items-start justify-between gap-4">
+    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-10">
+      <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Buy Together</h1>
-          <p>Paste your group chat. Get one clean order.</p>
+          <h1 className="text-3xl font-semibold">Buy Together</h1>
+          <p className="text-lg">Paste your group chat. Get one clean order.</p>
         </div>
         {(state.text || total > 0) && !state.building && (
-          <button type="button" onClick={startOver} className="shrink-0 text-sm underline">
+          <button type="button" onClick={startOver} className="min-h-11 shrink-0 underline">
             Start over
           </button>
         )}
       </header>
 
-      <PastePanel
-        text={state.text}
-        onTextChange={(text) => dispatch({ type: "setText", text })}
-        onLoadSample={() => dispatch({ type: "setText", text: SAMPLE_CHAT })}
-        onBuild={buildOrder}
-        building={state.building}
-        status={status}
-      />
+      {/* Phone: one column. Laptop: the chat on the left, the notebook on the right. */}
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-4">
+          <PastePanel
+            text={state.text}
+            onTextChange={(text) => dispatch({ type: "setText", text })}
+            onLoadSample={() => dispatch({ type: "setText", text: SAMPLE_CHAT })}
+            onBuild={buildOrder}
+            building={state.building}
+            status={status}
+          />
+          {total > 0 && (
+            <MessageList messages={state.messages} reads={state.reads} order={order} onRetry={readOne} />
+          )}
+        </div>
 
-      {total > 0 && (
-        <>
-          <MessageList messages={state.messages} reads={state.reads} order={order} onRetry={readOne} />
+        <div className="flex min-w-0 flex-col gap-4">
           <OrderSheet
             groups={order.groups}
             building={state.building}
@@ -251,8 +256,8 @@ export default function Home() {
             onFix={(entryId, quantity) => dispatch({ type: "fix", entryId, quantity })}
           />
           {order.groups.length > 0 && <Summary groups={order.groups} prices={prices} />}
-        </>
-      )}
+        </div>
+      </div>
     </main>
   );
 }
