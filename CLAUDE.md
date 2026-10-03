@@ -270,6 +270,8 @@ Never use the section 17 demo messages as examples, or the demo proves nothing.
   - `<Media omitted>`
   - "joined", "left", "added", "removed"
   - "This message was deleted"
+- If any line has a WhatsApp timestamp, only timestamped lines start messages (so "note: blue wale" stays a continuation). Plain `Name: text` is used only when no line has a timestamp.
+- Strip the `<This message was edited>` tag. "Added"/"removed"/"left" lines are only skipped when they use contact names (capitalised, phone number, or "You"), so "pen removed kar do" is kept.
 - Real exports contain invisible characters. Strip `U+200E` (iOS adds it at line starts) and treat `U+202F` / `U+00A0` (newer Android puts one before "pm") as a normal space. Test both.
 - Output: `{ id, sender, time, text }[]` in chat order.
 
