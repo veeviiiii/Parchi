@@ -170,7 +170,7 @@ Keep the model name and SDK client in `lib/gemma.ts`. A Next.js route file may o
   - system instruction = the prompt from `lib/prompt.ts`
   - JSON response MIME type, plus a response schema matching section 7 (`variant` and `quantity` nullable)
   - low temperature (~0.2)
-  - don't enable thinking
+  - don't enable thinking: leave the thinking config unset first; if replies are slow or contain thought text, set the lowest thinking level (that's what the AI Studio check used)
   - no Google Search grounding or other tools
 - **One message, one fresh request.** Every call contains only the system instruction and the single message being read. Never send earlier messages or earlier answers as chat history. Testing showed earlier answers in the history make Gemma repeat its mistakes.
 - **Fallback for unsupported settings.** If the API rejects the system instruction or JSON MIME type for this model, prepend the prompt to the message content instead, and rely on the cleanup step below.
@@ -268,6 +268,7 @@ Never use the section 17 demo messages as examples, or the demo proves nothing.
   - `<Media omitted>`
   - "joined", "left", "added", "removed"
   - "This message was deleted"
+- Real exports contain invisible characters. Strip `U+200E` (iOS adds it at line starts) and treat `U+202F` / `U+00A0` (newer Android puts one before "pm") as a normal space. Test both.
 - Output: `{ id, sender, time, text }[]` in chat order.
 
 ---
@@ -282,6 +283,10 @@ Process results in chat order:
 | `cancel` with items | Remove that sender's earlier items with the same `name`. |
 | `cancel` with no items | Remove all of that sender's earlier items. |
 | `not_an_order` | Ignore. |
+
+**Edge cases:**
+- A `cancel` that names items but matches none of that sender's earlier items (e.g. Gemma named it `copy` instead of `notebook`) → nothing is removed, and the message shows as "Needs a check". Never fail silently.
+- An `add` with no items but a note (e.g. "mere liye bhi same") creates no row. It shows only in the message list as "Needs a check". Fixing it needs manual row adding (nice-to-have).
 
 **Grouping:**
 - Group key = `name + variant`, lowercased and trimmed.
@@ -311,13 +316,14 @@ Process results in chat order:
 4. **Order sheet:**
    - One row per group: item and variant, total quantity, unit price input (₹), line total.
    - Expanding a row shows each person's quantity and exact quote.
-   - Flagged rows are highlighted and have an inline quantity input.
+   - Flagged rows are highlighted. The inline quantity input sits on each person's entry that has no quantity (a row can hold several people), shown without needing to expand the row.
 5. **Summary:**
    - grand total
    - who owes what
    - "Copy order for shop" button
    - (nice-to-have) "Copy who owes what" and "Download CSV"
    - After copying, show "Copied."
+   - `navigator.clipboard` only works on https or localhost. When it's missing (e.g. a phone opening `http://192.168.x.x:3000`), fall back to a hidden textarea + `document.execCommand("copy")`.
 
 **Copy formats:**
 ```
@@ -388,7 +394,7 @@ The last hour is for the demo, submission, and buffer. If a phase runs more than
 | # | Phase | Done when |
 |---|---|---|
 | 0 | `git init`; commit this spec; scaffold with `create-next-app` (TypeScript, Tailwind, App Router, ESLint, no `src/` dir); install `@google/genai`, `zod`, `vitest`; confirm `.env.local` is gitignored | `npm run dev` shows the starter page. `.env.local` isn't in `git status`. |
-| 1 | `lib/gemma.ts`, `lib/schema.ts`, `lib/prompt.ts`, `/api/parse`, plus a temporary `/dev` page to send one message and show the JSON | All 7 prompt test cases in section 9 return the expected result. |
+| 1 | `lib/gemma.ts`, `lib/schema.ts`, `lib/prompt.ts`, `/api/parse`, plus a temporary `/dev` page to send one message and show the JSON | All 10 prompt test cases in section 9 return the expected result. |
 | 2 | `lib/parseChat.ts` + `lib/sampleChat.ts` + vitest tests for all four chat formats and continuation lines | `npx vitest run` passes. |
 | 3 | Processing loop with progress, `lib/aggregate.ts` + tests, basic message list and order table | The sample chat produces the expected result in section 17. |
 | 4 | Flag fixing, prices, `lib/money.ts` + tests, totals, who owes what | Typing prices updates every total correctly. |
@@ -405,6 +411,8 @@ The last hour is for the demo, submission, and buffer. If a phase runs more than
 - Before saying a phase is done, run `npm run lint`, `npx vitest run` (from Phase 2), and `npm run build` (from Phase 4).
 - If the same error happens twice, stop. Explain the cause and give two options instead of retrying in a loop.
 - Never read, print, or edit the contents of `.env.local`.
+- This is Next.js 16, which has breaking changes from older versions. Before writing Next-specific code, read the relevant guide in `node_modules/next/dist/docs/` (see `AGENTS.md`).
+- Don't delete `AGENTS.md`. If it's missing, `next dev` writes its own block into this file.
 - Commit after every phase. The commit history shows the work was done during the event.
 - Prefer simple, readable code over clever code. The developer must be able to explain it to judges.
 
