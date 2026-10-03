@@ -170,7 +170,7 @@ Keep the model name and SDK client in `lib/gemma.ts`. A Next.js route file may o
   - system instruction = the prompt from `lib/prompt.ts`
   - JSON response MIME type, plus a response schema matching section 7 (`variant` and `quantity` nullable)
   - low temperature (~0.2)
-  - don't enable thinking: leave the thinking config unset first; if replies are slow or contain thought text, set the lowest thinking level (that's what the AI Studio check used)
+  - thinking level `MINIMAL` (the lowest this model accepts; `LOW` returns 400). *Tested at the event:* with thinking unset, Gemma repeated items, broke the JSON, and lost "packet" from "2 A4 sheet packet". `MINIMAL` fixed all three at the same speed (~2 s).
   - no Google Search grounding or other tools
 - **One message, one fresh request.** Every call contains only the system instruction and the single message being read. Never send earlier messages or earlier answers as chat history. Testing showed earlier answers in the history make Gemma repeat its mistakes.
 - **Fallback for unsupported settings.** If the API rejects the system instruction or JSON MIME type for this model, prepend the prompt to the message content instead, and rely on the cleanup step below.
@@ -183,10 +183,11 @@ Keep the model name and SDK client in `lib/gemma.ts`. A Next.js route file may o
   6. If it still fails, return a clear error the UI can show.
 - **Ignore notes on chatter (code).** If `intent` is `not_an_order`, discard `unclear`. Gemma sometimes copies the message into it, e.g. a question like "kal tak aa jayega kya?".
 - **Hallucination guard (code, not AI).** Check that each item's `source` appears in the original message, case-insensitive with whitespace normalised. If it doesn't, keep the item but add "Couldn't find this in the message — please check" to `unclear`.
+- **Duplicate guard (code).** Drop items that are exact repeats (same name, variant, quantity, source) within one message.
 - **Limits:**
   - Cap message text at 500 characters server-side.
   - The client sends one message per request, max 2 requests in parallel.
-  - Retry once on HTTP 429 or a network error, after a 2-second wait.
+  - Server: the SDK's built-in retry (`retryOptions: { attempts: 3, initialDelay: 2 }`) covers 429, 5xx and network errors, with a 15 s timeout per attempt. *Tested at the event:* about 1 call in 7 got "500 Internal error" from Google, so one retry wasn't enough. Route `maxDuration` = 60.
 
 ---
 
@@ -224,6 +225,7 @@ Write the actual prompt in `lib/prompt.ts` at the event. It must cover all of th
 - a vague quantity → item kept with `quantity: null` and a question in `unclear` (use `a few sticky notes pls`)
 - a cancel that names the item → `cancel` with that item listed (use `scale cancel kar do`)
 - chatter → `not_an_order` with `items: []` and `unclear: []` (use `thanks yaar`)
+- *Added at the event:* a number + colour followed by a second colour that leaves out the product (`4 blue folders and 2 green`). With `MINIMAL` thinking, Gemma read "3 black pens and 1 red" as black ×1 five times out of five until this example was added.
 
 Never use the section 17 demo messages as examples, or the demo proves nothing.
 
