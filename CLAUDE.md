@@ -290,6 +290,7 @@ Process results in chat order:
 
 **Edge cases:**
 - A `cancel` that names items but matches none of that sender's earlier items (e.g. Gemma named it `copy` instead of `notebook`) → nothing is removed, and the message shows as "Needs a check". Never fail silently.
+- A `cancel` that lists the same item twice is applied once. If a cancel item has a quantity ("cancel the 2 copies, 1 copy hi krde"), the items are still removed, but the message shows "Needs a check" with a note to confirm what the sender still wants.
 - An `add` with no items but a note (e.g. "mere liye bhi same") creates no row. It shows only in the message list as "Needs a check". Fixing it needs manual row adding (nice-to-have).
 
 **Grouping:**

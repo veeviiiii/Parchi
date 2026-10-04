@@ -95,16 +95,26 @@ export function aggregate(
     } else {
       // "cancel the copies": remove this sender's earlier items with the same name.
       const notes = [...result.unclear];
-      for (const item of result.items) {
-        const isMatch = (entry: Entry) =>
-          entry.sender === message.sender && normalise(entry.name) === normalise(item.name);
+      let needsCheck = false;
+      // Each product once, even if Gemma lists it twice ("cancel the 2 copies, 1 copy hi krde").
+      const names = [...new Set(result.items.map((item) => normalise(item.name)))];
+      for (const name of names) {
+        const isMatch = (entry: Entry) => entry.sender === message.sender && normalise(entry.name) === name;
         if (!active.some(isMatch)) {
-          notes.push(`Nothing earlier from ${message.sender} matched "${item.name}", so nothing was removed.`);
+          notes.push(`Nothing earlier from ${message.sender} matched "${name}", so nothing was removed.`);
+          needsCheck = true;
+          continue;
         }
         active = active.filter((entry) => !isMatch(entry));
+        // A number in a cancel ("1 copy hi krde") may mean they still want some.
+        if (result.items.some((item) => normalise(item.name) === name && item.quantity !== null)) {
+          notes.push(
+            `${message.sender}'s ${name} was removed. The message also mentions a quantity, so check what ${message.sender} still wants.`,
+          );
+          needsCheck = true;
+        }
       }
-      const allMatched = notes.length === result.unclear.length;
-      statuses[message.id] = { status: allMatched ? "cancelled" : "needs_check", notes };
+      statuses[message.id] = { status: needsCheck ? "needs_check" : "cancelled", notes };
     }
   }
 

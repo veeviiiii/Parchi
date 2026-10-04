@@ -81,6 +81,20 @@ describe("aggregate", () => {
     expect(order.messages.m2.notes[0]).toContain('matched "copy"');
   });
 
+  it("handles a cancel that lists the same item twice, with an accurate note", () => {
+    // "actually cancel the 2 copies, 1 copy hi krde"
+    const { messages, results } = chat(
+      ["Rahul", add([item("notebook", 2, "2 copy", "single line")])],
+      ["Rahul", cancel([item("notebook", 2, "2 copies"), item("notebook", 1, "1 copy")])],
+    );
+    const order = aggregate(messages, results);
+    expect(order.groups).toEqual([]); // his notebooks were removed
+    expect(order.messages.m2.status).toBe("needs_check");
+    expect(order.messages.m2.notes).toEqual([
+      "Rahul's notebook was removed. The message also mentions a quantity, so check what Rahul still wants.",
+    ]);
+  });
+
   it("only cancels earlier requests, not later ones", () => {
     const { messages, results } = chat(
       ["Rahul", cancel([item("pen", null, "pen")])],
