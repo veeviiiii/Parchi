@@ -254,13 +254,11 @@ export default function Landing() {
       <div id="glow" aria-hidden="true" />
 
       <nav aria-label="Main">
-        <div className="wrap">
+        <div className="wrap nav-row">
           <a className="logo" href="#top" style={{ fontSize: "1.6rem" }}>
             parchi<i>.</i>
           </a>
-          <div className="ctl">
-            <ThemeMenu label={t("th")} />
-            <LanguageMenu label={t("lg")} />
+          <div className="nav-links">
             <a className="nl" href="#features">
               {t("nf")}
             </a>
@@ -270,6 +268,10 @@ export default function Landing() {
             <Link className="nl" href="/crowdmind">
               Crowdmind
             </Link>
+          </div>
+          <div className="nav-actions">
+            <ThemeMenu label={t("th")} />
+            <LanguageMenu label={t("lg")} />
             <a className="btn p mag" href="#build" style={{ padding: "8px 18px", minHeight: 44 }}>
               {t("nb")}
             </a>
@@ -281,7 +283,6 @@ export default function Landing() {
         <header className="hero" id="hero">
           <Mural className="m-h" />
           <div className="wrap">
-            <span className="pill">✦ AI-powered order intelligence</span>
             <h1 aria-label="The Parchi is for everyone.">
               <span>{t("h1a")}</span>
               <span className="rot" id="rot" aria-hidden="true">
@@ -622,7 +623,8 @@ export default function Landing() {
 
         <section id="trust">
           <div className="wrap">
-            <h2>
+            <span className="pill">✦ AI-powered order intelligence</span>
+            <h2 style={{ marginTop: 18 }}>
               AI where it matters.
               <br />
               Code where it counts.

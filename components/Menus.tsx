@@ -23,7 +23,7 @@ function Dropdown({ id, label, button, children }: { id: string; label: string; 
   }, [open]);
   return (
     <div className="tsel" ref={box}>
-      <button className="tbtn" type="button" aria-label={label} aria-haspopup="true" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+      <button className="tbtn" type="button" aria-label={label} title={label} aria-haspopup="true" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
         {button}
       </button>
       <div className="tpop" id={id} role="radiogroup" aria-label={label} hidden={!open}>
