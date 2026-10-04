@@ -81,18 +81,31 @@ describe("aggregate", () => {
     expect(order.messages.m2.notes[0]).toContain('matched "copy"');
   });
 
-  it("handles a cancel that lists the same item twice, with an accurate note", () => {
+  it("lets the organiser confirm the new quantity when a cancel mentions one", () => {
     // "actually cancel the 2 copies, 1 copy hi krde"
     const { messages, results } = chat(
       ["Rahul", add([item("notebook", 2, "2 copy", "single line")])],
       ["Rahul", cancel([item("notebook", 2, "2 copies"), item("notebook", 1, "1 copy")])],
     );
-    const order = aggregate(messages, results);
-    expect(order.groups).toEqual([]); // his notebooks were removed
-    expect(order.messages.m2.status).toBe("needs_check");
-    expect(order.messages.m2.notes).toEqual([
-      "Rahul's notebook was removed. The message also mentions a quantity, so check what Rahul still wants.",
+
+    // Before: the old ×2 is gone, and a flagged row asks how many Rahul still wants.
+    const before = aggregate(messages, results);
+    expect(before.groups.map((g) => [g.name, g.variant, g.totalQuantity, g.flagged])).toEqual([
+      ["notebook", "single line", 0, true],
     ]);
+    expect(before.groups[0].entries[0]).toMatchObject({ id: "m2-keep-0", quantity: null, source: "2 copies, 1 copy" });
+    expect(before.messages.m2.status).toBe("needs_check");
+    expect(before.messages.m2.notes[0]).toContain("Type how many Rahul still wants");
+
+    // The organiser types 1.
+    const keepOne = aggregate(messages, results, { "m2-keep-0": 1 });
+    expect(keepOne.groups[0]).toMatchObject({ totalQuantity: 1, flagged: false });
+    expect(keepOne.messages.m2).toEqual({ status: "added", notes: [] });
+
+    // Or 0: nothing left for Rahul.
+    const keepNone = aggregate(messages, results, { "m2-keep-0": 0 });
+    expect(keepNone.groups[0].totalQuantity).toBe(0);
+    expect(keepNone.messages.m2.status).toBe("cancelled");
   });
 
   it("only cancels earlier requests, not later ones", () => {

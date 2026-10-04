@@ -95,26 +95,54 @@ export function aggregate(
     } else {
       // "cancel the copies": remove this sender's earlier items with the same name.
       const notes = [...result.unclear];
-      let needsCheck = false;
+      let unmatched = false;
+      const kept: Entry[] = [];
       // Each product once, even if Gemma lists it twice ("cancel the 2 copies, 1 copy hi krde").
       const names = [...new Set(result.items.map((item) => normalise(item.name)))];
       for (const name of names) {
         const isMatch = (entry: Entry) => entry.sender === message.sender && normalise(entry.name) === name;
-        if (!active.some(isMatch)) {
+        const removed = active.filter(isMatch);
+        if (removed.length === 0) {
           notes.push(`Nothing earlier from ${message.sender} matched "${name}", so nothing was removed.`);
-          needsCheck = true;
+          unmatched = true;
           continue;
         }
         active = active.filter((entry) => !isMatch(entry));
+
         // A number in a cancel ("1 copy hi krde") may mean they still want some.
-        if (result.items.some((item) => normalise(item.name) === name && item.quantity !== null)) {
+        // Put back a row with no quantity, so the organiser types how many (0 for none).
+        const withQuantity = result.items.filter((item) => normalise(item.name) === name && item.quantity !== null);
+        if (withQuantity.length === 0) continue;
+        const newRows: Entry[] = [...new Set(removed.map((entry) => entry.variant))].map((variant) => {
+          const id = `${message.id}-keep-${kept.length}`;
+          const fixed = id in fixes;
+          const row: Entry = {
+            id,
+            messageId: message.id,
+            sender: message.sender,
+            name: removed[0].name,
+            variant,
+            quantity: fixed ? fixes[id] : null,
+            source: withQuantity.map((item) => item.source).join(", "),
+            notes: [],
+            fixed,
+            flagged: !fixed,
+          };
+          kept.push(row);
+          return row;
+        });
+        if (newRows.some((row) => !row.fixed)) {
           notes.push(
-            `${message.sender}'s ${name} was removed. The message also mentions a quantity, so check what ${message.sender} still wants.`,
+            `${message.sender}'s ${name} was removed, but the message also mentions a quantity. Type how many ${message.sender} still wants on the order sheet (0 for none).`,
           );
-          needsCheck = true;
         }
       }
-      statuses[message.id] = { status: needsCheck ? "needs_check" : "cancelled", notes };
+      active.push(...kept);
+
+      let status: MessageStatus = "cancelled";
+      if (unmatched || kept.some((row) => row.flagged)) status = "needs_check";
+      else if (kept.some((row) => (row.quantity ?? 0) > 0)) status = "added";
+      statuses[message.id] = { status, notes };
     }
   }
 
