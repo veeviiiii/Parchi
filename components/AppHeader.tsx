@@ -15,7 +15,7 @@ export default function AppHeader({ profile }: { profile: Profile | null }) {
             parchi<i>.</i>
           </Link>
           <div className="nav-links">
-            <Link className="nl" href="/#build">
+            <Link className="nl" href="/build">
               Build a Parchi
             </Link>
             <Link className="nl" href="/crowdmind">

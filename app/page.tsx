@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import Builder, { LOAD_SAMPLE_EVENT } from "@/components/Builder";
 import { LanguageMenu, ThemeMenu, useLanguage } from "@/components/Menus";
-import { useProfile } from "@/lib/profile";
 
 // The landing page, ported from the designer's HTML. Demo sections are static examples;
-// the "Build a Parchi" section is the real app (components/Builder.tsx).
+// "Build a Parchi" is the real app, on its own page (/build).
 
 // Text that changes with the language menu. Only Hindi is translated; other languages show English.
 const EN = {
@@ -93,7 +91,6 @@ function Mural({ className }: { className: string }) {
 }
 
 export default function Landing() {
-  const { profile } = useProfile();
   const lang = useLanguage();
   const t = (key: keyof typeof EN) => (lang === "hi" ? (HI[key] ?? EN[key]) : EN[key]);
   const lines = (key: keyof typeof EN) =>
@@ -272,9 +269,9 @@ export default function Landing() {
           <div className="nav-actions">
             <ThemeMenu label={t("th")} />
             <LanguageMenu label={t("lg")} />
-            <a className="btn p mag" href="#build" style={{ padding: "8px 18px", minHeight: 44 }}>
+            <Link className="btn p mag" href="/build" style={{ padding: "8px 18px", minHeight: 44 }}>
               {t("nb")}
-            </a>
+            </Link>
           </div>
         </div>
       </nav>
@@ -300,12 +297,12 @@ export default function Landing() {
               {t("lead")}
             </p>
             <div className="ctas">
-              <a className="btn p mag" href="#build">
+              <Link className="btn p mag" href="/build">
                 <span>{t("nb")}</span> <span className="ar">→</span>
-              </a>
-              <a className="btn mag" href="#build" id="trysample" onClick={() => dispatchEvent(new Event(LOAD_SAMPLE_EVENT))}>
+              </Link>
+              <Link className="btn mag" href="/build?sample=1" id="trysample">
                 {t("ts")}
-              </a>
+              </Link>
             </div>
             <div className="stage">
               <span className="bub b1">&quot;2 blue notebooks bhej dena&quot;</span>
@@ -619,8 +616,6 @@ export default function Landing() {
           </div>
         </section>
 
-        <Builder profile={profile} />
-
         <section id="trust">
           <div className="wrap">
             <span className="pill">✦ AI-powered order intelligence</span>
@@ -671,9 +666,9 @@ export default function Landing() {
           </span>
           <h2>{t("fin")}</h2>
           <p style={{ fontSize: "1.4rem", fontWeight: 700, marginTop: 10 }}>Turn it into a parchi.</p>
-          <a className="btn mag" href="#build">
+          <Link className="btn mag" href="/build">
             Build your first Parchi <span className="ar">→</span>
-          </a>
+          </Link>
         </div>
       </main>
 
@@ -695,9 +690,9 @@ export default function Landing() {
         </div>
       </footer>
       <div className="sticky">
-        <a className="btn p" href="#build">
+        <Link className="btn p" href="/build">
           Build a Parchi →
-        </a>
+        </Link>
       </div>
     </div>
   );

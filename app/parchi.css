@@ -25,7 +25,7 @@ body{background:var(--off);color:var(--ink);font-family:var(--ff)}
 
 /* ---- The design ---- */
 html{scroll-behavior:smooth;scroll-padding-top:env(safe-area-inset-top,0px)}
-.pl{margin:0;background:var(--off);color:var(--navy);font-family:var(--ff);line-height:1.55;overflow-x:hidden}
+.pl{margin:0;background:var(--off);color:var(--navy);font-family:var(--ff);line-height:1.55;overflow-x:clip}
 :is(.pl,.pnav) h1,:is(.pl,.pnav) h2,:is(.pl,.pnav) h3,:is(.pl,.pnav) p{margin:0}
 :is(.pl,.pnav) h1,:is(.pl,.pnav) h2{letter-spacing:-.035em;line-height:1.05;font-weight:800}
 :is(.pl,.pnav) a{color:inherit}
@@ -283,3 +283,14 @@ html[data-theme=mono] :is(.pl,.pnav) .mo{opacity:.85}
   :is(.pl,.pnav) .nav-links .nl{padding:6px 10px;font-size:.92rem}
   :is(.pl) .nav-actions .btn{display:none}
 }
+
+/* ---- The /build page ---- */
+:is(.pl) #build{padding-top:56px}
+
+/* ---- "Your Parchi" looks like a page from a ruled school notebook ("copy"):
+   a red margin line on the left, faint ruled lines between items, and quantities written on blanks. ---- */
+:is(.pl) .parchi-paper{position:relative;padding-left:64px;background:linear-gradient(to right,transparent 42px,color-mix(in srgb,#d64545 65%,var(--ac)) 42px,color-mix(in srgb,#d64545 65%,var(--ac)) 43.5px,transparent 43.5px,transparent 46px,color-mix(in srgb,#d64545 40%,transparent) 46px,color-mix(in srgb,#d64545 40%,transparent) 47px,transparent 47px),var(--card2)}
+:is(.pl) .parchi-paper .it{border-bottom:1px solid color-mix(in srgb,var(--ac) 22%,transparent)}
+:is(.pl) .parchi-paper .it:last-of-type{border-bottom:0}
+:is(.pl) .parchi-paper input{border:0;border-bottom:1.5px solid color-mix(in srgb,var(--ac) 45%,transparent);border-radius:0;background:transparent;min-height:34px;padding:2px 6px;text-align:center}
+:is(.pl) .parchi-paper input:focus-visible{border-radius:4px}

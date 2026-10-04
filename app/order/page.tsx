@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// The order builder now lives on the landing page, in the "Build a Parchi" section.
+// The order builder now lives at /build.
 export default function OrderPage() {
-  redirect("/#build");
+  redirect("/build");
 }

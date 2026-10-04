@@ -1,130 +1,141 @@
-# Buy Together
+# Parchi
 
-**Paste your group chat. Get one clean order.**
+**From chat to clarity. Paste a messy WhatsApp chat, get one clean order, a proper bill, and a community in the loop.**
 
-Buy Together turns a messy group chat full of "mere liye bhi ek le aana" into one grouped shopping list, with prices and who owes what. Gemma 4 reads every message, including Hinglish, vague amounts, and people changing their minds.
+Parchi turns group chats full of "mere liye bhi ek le aana" into one grouped shopping list ("parchi"), with prices, who owes what, and a printable bill. Gemma 4 reads every message, including Hinglish, vague amounts, and cancellations. A second Gemma job runs **Crowdmind**, a community feed where shops, groups, and buyers share stock, offers, and quotes, with prices pulled out and scams blocked.
 
 **Live demo:** https://parchi-self.vercel.app/
 
 <p>
-  <img src="docs/messages.jpg" alt="How each message was read: Gemma turns 'bhai 2 copy chahiye single line wali' into Notebook (single line) × 2, ignores 'ok 👍', and reads Rahul's later message as a cancel" width="49%">
-  <img src="docs/order-sheet.jpg" alt="The order sheet styled as a ruled school notebook, with Priya's pens marked by a yellow highlighter because the quantity is unknown, prices typed in, and a total of ₹485" width="49%">
+  <img src="docs/landing.jpg" alt="Parchi landing page: 'The Parchi is for everyone.' with the word Parchi rotating through Indian scripts" width="49%">
+  <img src="docs/parchi.jpg" alt="Your Parchi: the final order on a ruled notebook page with a red margin line; Priya's pens are flagged 'Needs a check' because the quantity is unknown" width="49%">
 </p>
 
 ## The problem
 
-In every hostel, class, or club group, one person collects everyone's requests before going to the shop. The requests are:
+In every hostel, class, society, or shop group, one person collects everyone's requests. The requests are:
 
 - scattered across a long chat
 - in Hinglish ("do pencil aur ek sharpener chahiye")
 - vague ("some pens for me")
 - changed later ("actually cancel the copies, I found mine")
 
-Combining them by hand is slow and easy to get wrong. Working out who owes what afterwards is worse.
+Combining them by hand is slow and easy to get wrong. Working out who owes what, and making a bill, is worse.
 
 ## What it does
 
-1. **Paste the chat** or upload a WhatsApp "Export chat" `.txt` file. Android, iOS, and copied-from-WhatsApp formats all work.
-2. **Gemma reads each message** and the app shows how each one was read: Added, Cancelled, Ignored, or Needs a check.
-3. **One order sheet** groups everyone's requests: "copy" becomes Notebook, cancellations are applied, and chatter like "ok 👍" is ignored.
-4. **Nothing is guessed.** If someone says "some pens", Gemma doesn't invent a number. The row is marked with a highlighter and asks "How many?", and the organiser types it in.
-5. **Type prices** and every line total, the grand total, and **who owes what** update instantly.
-6. **Copy the order for the shop** and **copy who owes what** for the group, ready to paste into WhatsApp. There's also a CSV download.
+**Build a Parchi** ([/build](https://parchi-self.vercel.app/build))
+1. **Paste the chat** or upload a WhatsApp "Export chat" `.txt`. Android, iOS, and copied formats all work.
+2. **Gemma reads each message** and shows how it was read: Added, Cancelled, Ignored, or Needs a check.
+3. **One parchi** groups everyone's requests: "copy" becomes Notebook, cancels are applied, chatter is ignored.
+4. **Nothing is guessed.** "Some pens"? The row is flagged and asks "How many pens?" for the organiser to fill in.
+5. **Type prices** to get line totals, the grand total, and **who owes what**.
+6. **Copy the order for the shop**, copy who owes what, download a CSV, or **generate a bill**.
 
-Work is saved in the browser, so a refresh doesn't lose the order.
+**Bills:** bill number, date (IST), amount in words in the Indian system ("Rupees Twelve Lakh…"), a per-person split for groups that adds up to the paisa, one bill per customer for shops. Print or save as PDF, or copy as text for WhatsApp.
+
+**Roles:** Consumer, Community (a group), or Merchant (a shop). The role decides who your bills are from and to, and which Crowdmind space you read.
+
+**Crowdmind:** a feed per space. Shops post stock and offers to buyers, groups call for orders, and anyone can ask for quotes. Gemma tags each post, writes a one-line summary, lists the prices quoted, and blocks scams (OTP, UPI PIN, advance-payment tricks). The server checks who may read and post in each space.
+
+**Themes:** Parchi Classic, Vintage, and Mono. The landing page also has a Hindi translation.
 
 ## Gemma model used
 
-**`gemma-4-26b-a4b-it`** (Gemma 4 26B A4B) through the **Gemini API**, using Google's official [`@google/genai`](https://www.npmjs.com/package/@google/genai) SDK.
+**`gemma-4-26b-a4b-it`** (Gemma 4 26B A4B) through the **Gemini API**, using Google's official [`@google/genai`](https://www.npmjs.com/package/@google/genai) SDK. It's a mixture-of-experts model (about 4B parameters active per token), so each message comes back in about 2 seconds. Switch models with the `GEMMA_MODEL` environment variable.
 
-It's a mixture-of-experts model: only about 4B parameters are active per token, so each message comes back in about 2 seconds. You can switch models with the `GEMMA_MODEL` environment variable (fallback: `gemma-4-31b-it`).
+Gemma does two jobs, both returning JSON that code validates with `zod` before trusting it:
 
-Where it's integrated:
+| Job | Input → output | Files |
+|---|---|---|
+| **1. Read an order message** | one chat message → `{ intent, items[{name, variant, quantity, source}], unclear }` | [`lib/readMessage.ts`](lib/readMessage.ts), [`lib/prompt.ts`](lib/prompt.ts), [`app/api/parse/route.ts`](app/api/parse/route.ts) |
+| **2. Check a Crowdmind post** | one post → `{ tag, summary, items[{name, variant, price, unit, source}], moderation }` | [`lib/crowdmind/checkPost.ts`](lib/crowdmind/checkPost.ts), [`lib/crowdmind/prompt.ts`](lib/crowdmind/prompt.ts), [`app/api/crowdmind/posts/route.ts`](app/api/crowdmind/posts/route.ts) |
 
-| File | What it does |
-|---|---|
-| [`lib/gemma.ts`](lib/gemma.ts) | SDK client, model name, request settings, retries. The only file that calls Gemma. |
-| [`lib/prompt.ts`](lib/prompt.ts) | The system prompt and its worked examples. |
-| [`app/api/parse/route.ts`](app/api/parse/route.ts) | The server route the browser calls. The API key never reaches the browser. |
-
-Request settings: structured JSON output with a response schema, temperature 0.2, thinking level `MINIMAL`, no tools, and **one fresh request per message** with no chat history.
+Shared setup: [`lib/gemma.ts`](lib/gemma.ts) (client and model, the only file that calls Gemma) and [`lib/gemmaJson.ts`](lib/gemmaJson.ts) (one call, clean the JSON, validate, retry once). Settings: structured JSON output with a response schema, temperature 0.2, thinking level `MINIMAL`, SDK retries for 429/5xx, and **one fresh request per message**, never chat history. The API key stays on the server.
 
 ## What Gemma does vs what code does
 
 | Gemma 4 | Plain code |
 |---|---|
-| Reads **one** message at a time, in English, Hindi, or Hinglish | Splits the chat into messages, senders, and times |
-| Decides if it's an order, a cancel, or just chatter | Checks Gemma's JSON with `zod`, and checks every quoted phrase really is in the message |
-| Names each product, its variant, and its quantity (or `null` if vague) | Applies cancellations in chat order and groups the same items |
-| Quotes the exact words it used, and asks a question when unsure | Handles all prices, totals, who owes what, and the copy/CSV exports |
+| Reads **one** message or post, in English, Hindi, or Hinglish | Splits the chat into messages, senders, and times |
+| Decides: order, cancel, or chatter; tags posts and spots scams | Validates every answer with `zod` and checks each quoted phrase is really in the text |
+| Names products, variants, quantities (or `null` if vague), and quoted prices | Applies cancels, groups items, and keeps a post's price only if it's written in its quote |
+| Quotes the exact words it used, and asks when unsure | All prices, totals, splits, bills, permissions, and exports |
 
-Gemma never sees prices and never invents a quantity. Anything unclear is flagged for the organiser to fix.
+Gemma never sees the organiser's prices and never invents a quantity or price. Anything unclear is flagged for a person to fix. If Gemma can't check a Crowdmind post, the post isn't published.
 
 ## What we learned getting Gemma right
 
-We tested every prompt change against 10 test messages and the demo chat, several runs each:
+We test every prompt change with [`scripts/prompt-tests.mjs`](scripts/prompt-tests.mjs): 10 order messages and 6 Crowdmind posts, all passing.
 
-- **Worked examples beat rules.** Gemma ignored written rules about vague amounts and cancels, but followed a worked JSON example immediately. "3 black pens and 1 red" was read as 1 black pen every time until one similar example was added.
-- **`MINIMAL` thinking matters.** With thinking off, Gemma sometimes repeated items or broke the JSON, and dropped "packet" from "2 A4 sheet packet". `MINIMAL` fixed all three at the same speed.
-- **Trust, but check.** Code drops repeated items, flags any item whose quote isn't in the message, and retries Google's occasional "500" errors (about 1 call in 7 in our tests).
+- **Worked examples beat rules.** Gemma ignored written rules about vague amounts and cancels but followed a worked JSON example immediately. Crowdmind kept "copy" as "copy" until one example showed copy → notebook.
+- **`MINIMAL` thinking matters.** With thinking off, Gemma sometimes repeated items or broke the JSON. `MINIMAL` fixed it at the same speed.
+- **Trust, but check.** Code drops repeated items, flags quotes that aren't in the message, and retries Google's occasional "500" errors (about 1 call in 7).
 
 ## AI usage credit
 
-- **At runtime**, the app uses **Gemma 4 (`gemma-4-26b-a4b-it`) via the Gemini API** to read every chat message.
-- **While building**, the code, tests, and this README were written with help from **[Claude Code](https://claude.com/claude-code) (Anthropic)** as a pair programmer, working from the project spec in [`CLAUDE.md`](CLAUDE.md).
+- **At runtime**, the app uses **Gemma 4 (`gemma-4-26b-a4b-it`) via the Gemini API** to read every chat message and every Crowdmind post.
+- **While building**, the code, tests, and this README were written with help from **[Claude Code](https://claude.com/claude-code) (Anthropic)** as a pair programmer, working from the project specs in [`CLAUDE.md`](CLAUDE.md) and [`FEATURES_V2.md`](FEATURES_V2.md).
+
+**Honesty note:** roles are self-chosen for the demo. A real launch needs verified merchant accounts.
+
+## Tech stack
+
+Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, `zod`, `@google/genai`, Supabase (Crowdmind posts), Vitest, and Vercel. Details in [docs/TECH_STACK.md](docs/TECH_STACK.md).
 
 ## Setup
 
 You need Node.js 20 or newer and a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
 
-1. Clone the repo:
+1. Clone and install:
    ```bash
-   git clone <this-repo-url>
-   cd buy-together
-   ```
-2. Install packages:
-   ```bash
+   git clone https://github.com/veeviiiii/Parchi.git
+   cd Parchi
    npm install
    ```
-3. Create a file called `.env.local` in the project folder:
+2. Create `.env.local` in the project folder:
    ```
    GEMINI_API_KEY=your-key-here
-   # optional, this is the default:
+   # optional:
    GEMMA_MODEL=gemma-4-26b-a4b-it
+   # optional, for Crowdmind posts that persist (otherwise posts live in memory):
+   SUPABASE_URL=https://xxxx.supabase.co
+   SUPABASE_SECRET_KEY=sb_secret_...
    ```
-   `.env.local` is in `.gitignore`, so your key is never committed.
-4. Start the app:
+   `.env.local` is in `.gitignore`, so keys are never committed. For Supabase, run the SQL in [`FEATURES_V2.md`](FEATURES_V2.md) section 9 first.
+3. Start the app:
    ```bash
    npm run dev
    ```
-   Open http://localhost:3000, click **Load sample chat**, then **Build order**.
+   Open http://localhost:3000, click **Build a Parchi**, then **Load sample chat** and **Build order**.
 
-Run the tests with `npx vitest run`.
+Tests: `npx vitest run` (unit tests) and `node scripts/prompt-tests.mjs` (Gemma prompt tests against the running app).
 
 ## Deploy on Vercel
 
-1. Push the repo to GitHub. Check `.env.local` is **not** in it.
-2. On [vercel.com](https://vercel.com), choose **Add New → Project** and import the GitHub repo. Vercel detects Next.js by itself.
-3. Under **Environment Variables**, add `GEMINI_API_KEY` (and optionally `GEMMA_MODEL`).
-4. Click **Deploy**, then paste the link at the top of this README.
+Import the GitHub repo on [vercel.com](https://vercel.com), add `GEMINI_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SECRET_KEY` under Environment Variables, and deploy. Every push to `main` redeploys.
 
 ## Project structure
 
 ```
 app/
-  page.tsx              the single page; state and the build loop live here
-  api/parse/route.ts    the only route that calls Gemma
-components/             PastePanel, MessageList, OrderSheet, Summary
+  page.tsx                  landing page
+  build/page.tsx            Build a Parchi (the order builder)
+  crowdmind/page.tsx        community feed for your role's space
+  bill/[id]/page.tsx        printable bill
+  start/page.tsx            pick your role
+  api/parse/route.ts        Gemma job 1: read one message
+  api/crowdmind/posts/      Gemma job 2: check a post; feed by space
+components/                 Builder, AppHeader, Menus (theme, language), RoleGate
 lib/
-  gemma.ts, prompt.ts   Gemma client and prompt
-  schema.ts             zod schema + cleanup and guards for Gemma's answer
-  parseChat.ts          chat text → messages
-  aggregate.ts          answers → grouped order (cancels, flags)
-  money.ts              prices, totals, who owes what
-  exports.ts            shop text, who-owes text, CSV
+  gemma.ts, gemmaJson.ts    Gemma client and the shared JSON helper
+  readMessage.ts, prompt.ts, schema.ts   job 1
+  crowdmind/                job 2: prompt, schema, store (Supabase or memory), seed posts
+  parseChat.ts              chat text → messages
+  aggregate.ts              answers → grouped order (cancels, flags)
+  money.ts, bill.ts         prices, totals, who owes what, bills
+  roles.ts, profile.ts      roles and the access matrix
 ```
-
-Built with Next.js, TypeScript, Tailwind CSS, `zod`, and `vitest`.
 
 ## License
 

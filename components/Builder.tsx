@@ -40,7 +40,6 @@ type Action =
   | { type: "fix"; entryId: string; quantity: number | null }
   | { type: "price"; key: string; text: string };
 
-export const LOAD_SAMPLE_EVENT = "parchi-load-sample";
 const SAVE_KEY = "parchi.order";
 // Each message is one Gemma request (~1 per second), so very long exports are capped.
 const MAX_MESSAGES = 60;
@@ -167,7 +166,7 @@ const PILL: Record<string, [string, string]> = {
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-// The "Build a Parchi" section: paste a chat, Gemma reads each message, code builds the order.
+// The "Build a Parchi" page: paste a chat, Gemma reads each message, code builds the order.
 export default function Builder({ profile }: { profile: Profile | null }) {
   const router = useRouter();
   const [state, dispatch] = useReducer(reducer, EMPTY);
@@ -180,9 +179,11 @@ export default function Builder({ profile }: { profile: Profile | null }) {
   // On first load, bring back any saved work. (localStorage only exists in the browser.)
   useEffect(() => {
     dispatch({ type: "restore", saved: loadSaved() });
-    const loadSample = () => dispatch({ type: "setText", text: SAMPLE_CHAT });
-    window.addEventListener(LOAD_SAMPLE_EVENT, loadSample); // the hero's "Try a sample chat"
-    return () => window.removeEventListener(LOAD_SAMPLE_EVENT, loadSample);
+    // The landing page's "Try a sample chat" opens /build?sample=1.
+    if (new URLSearchParams(window.location.search).get("sample") === "1") {
+      dispatch({ type: "setText", text: SAMPLE_CHAT });
+      window.history.replaceState(null, "", "/build");
+    }
   }, []);
 
   // Save after every change, once the restore above has happened.
@@ -267,7 +268,7 @@ export default function Builder({ profile }: { profile: Profile | null }) {
   const isMerchant = profile?.role === "merchant";
   function makeBill(sender?: string) {
     if (!profile) {
-      router.push(`/start?next=${encodeURIComponent("/#build")}`);
+      router.push(`/start?next=${encodeURIComponent("/build")}`);
       return;
     }
     const bill = buildBill({
@@ -369,7 +370,7 @@ export default function Builder({ profile }: { profile: Profile | null }) {
                 </div>
 
                 <h3 style={{ margin: "28px 0 12px" }}>Your Parchi</h3>
-                <div className="card order" style={{ transform: "none" }}>
+                <div className="card order parchi-paper" style={{ transform: "none" }}>
                   {groups.length === 0 ? (
                     <p className="lead">{state.building ? "Reading…" : "No items found in this chat."}</p>
                   ) : (
