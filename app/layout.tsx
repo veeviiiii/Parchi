@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Hind, Kalam } from "next/font/google";
+import { Hind, Kalam, Rozha_One } from "next/font/google";
 import "./globals.css";
 
-// Both by Indian Type Foundry, both with Devanagari (CLAUDE.md section 13).
+// All three by Indian Type Foundry, all with Devanagari.
 // Hind for all UI text.
 const hind = Hind({
   variable: "--font-hind",
@@ -17,14 +17,21 @@ const kalam = Kalam({
   weight: ["400", "700"],
 });
 
+// Rozha One only for the पर्ची wordmark.
+const rozha = Rozha_One({
+  variable: "--font-rozha-one",
+  subsets: ["latin", "devanagari"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
-  title: "Buy Together",
-  description: "Paste your group chat. Get one clean order.",
+  title: "Parchi",
+  description: "Parchi for everyone. Paste a messy chat, get a clean order, a proper bill, and a community in the loop.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${hind.variable} ${kalam.variable} h-full antialiased`}>
+    <html lang="en" className={`${hind.variable} ${kalam.variable} ${rozha.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

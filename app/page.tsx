@@ -1,263 +1,109 @@
 "use client";
 
-import { useEffect, useMemo, useReducer } from "react";
-import MessageList, { type ReadState } from "@/components/MessageList";
-import OrderSheet from "@/components/OrderSheet";
-import PastePanel from "@/components/PastePanel";
-import Summary from "@/components/Summary";
-import { aggregate } from "@/lib/aggregate";
-import { parsePrices } from "@/lib/money";
-import { parseChat, type ChatMessage } from "@/lib/parseChat";
-import { SAMPLE_CHAT } from "@/lib/sampleChat";
-import type { ParseResult } from "@/lib/schema";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import ParchiMark from "@/components/ParchiMark";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/styles";
+import { saveProfile, useProfile } from "@/lib/profile";
+import { NAME_LABEL, ROLE_LABEL, ROLE_PITCH, ROLES, type Role } from "@/lib/roles";
 
-// What gets saved in the browser, so a refresh doesn't lose the order.
-type Saved = {
-  text: string;
-  messages: ChatMessage[];
-  reads: Record<string, ReadState>;
-  fixes: Record<string, number>; // quantities the organiser typed, by entry id
-  priceTexts: Record<string, string>; // price boxes, by order-sheet row
-};
+// Landing: who are you? The choice shapes the order builder and Crowdmind.
+export default function Landing() {
+  const router = useRouter();
+  const { profile, ready } = useProfile();
+  const [changing, setChanging] = useState(false);
+  const [role, setRole] = useState<Role | null>(null);
+  const [name, setName] = useState("");
 
-type State = Saved & {
-  building: boolean;
-  hint: string | null;
-  restored: boolean; // true once we've checked the browser for saved work
-};
-
-type Action =
-  | { type: "restore"; saved: Saved | null }
-  | { type: "reset" }
-  | { type: "setText"; text: string }
-  | { type: "start"; messages: ChatMessage[]; hint: string | null }
-  | { type: "read"; id: string; read: ReadState }
-  | { type: "finish" }
-  | { type: "fix"; entryId: string; quantity: number | null }
-  | { type: "price"; key: string; text: string };
-
-const START_HINT = "Paste a chat or load the sample to start.";
-const SAVE_KEY = "buy-together-v1";
-// Each message is one Gemma request (~1 per second), so very long exports are capped.
-const MAX_MESSAGES = 60;
-
-const EMPTY: State = {
-  text: "",
-  messages: [],
-  reads: {},
-  fixes: {},
-  priceTexts: {},
-  building: false,
-  hint: START_HINT,
-  restored: false,
-};
-
-// Drops fixes for one message's entries (ids look like "m3-0", "m3-1").
-function withoutFixesFor(fixes: Record<string, number>, messageId: string) {
-  return Object.fromEntries(Object.entries(fixes).filter(([id]) => !id.startsWith(`${messageId}-`)));
-}
-
-function reducer(state: State, action: Action): State {
-  switch (action.type) {
-    case "restore": {
-      if (!action.saved) return { ...state, restored: true };
-      // A read that was in progress when the page closed has to be retried.
-      const reads: Record<string, ReadState> = {};
-      for (const [id, read] of Object.entries(action.saved.reads)) {
-        reads[id] = read.status === "reading" ? { status: "failed", error: "Interrupted. Retry." } : read;
-      }
-      return { ...state, ...action.saved, reads, hint: action.saved.messages.length ? null : START_HINT, restored: true };
-    }
-    case "reset":
-      return { ...EMPTY, restored: true };
-    case "setText":
-      return { ...state, text: action.text };
-    case "start":
-      // New messages get new ids, so old fixes no longer apply. Prices stay: they're per item.
-      return {
-        ...state,
-        messages: action.messages,
-        reads: {},
-        building: action.messages.length > 0,
-        hint: action.hint,
-        fixes: {},
-      };
-    case "read": {
-      // Re-reading a message (Retry) may give different items, so forget its fixes.
-      const fixes = action.read.status === "reading" ? withoutFixesFor(state.fixes, action.id) : state.fixes;
-      return { ...state, reads: { ...state.reads, [action.id]: action.read }, fixes };
-    }
-    case "finish":
-      return { ...state, building: false };
-    case "fix": {
-      const fixes = { ...state.fixes };
-      if (action.quantity === null) delete fixes[action.entryId];
-      else fixes[action.entryId] = action.quantity;
-      return { ...state, fixes };
-    }
-    case "price":
-      return { ...state, priceTexts: { ...state.priceTexts, [action.key]: action.text } };
-  }
-}
-
-// Reads saved work from the browser. Anything unexpected counts as "nothing saved".
-function loadSaved(): Saved | null {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? "null");
-    if (!saved || !Array.isArray(saved.messages)) return null;
-    return {
-      text: String(saved.text ?? ""),
-      messages: saved.messages,
-      reads: saved.reads ?? {},
-      fixes: saved.fixes ?? {},
-      priceTexts: saved.priceTexts ?? {},
-    };
-  } catch {
-    return null;
-  }
-}
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Sends one message to our server. Retries once, after 2 s, on a rate limit or network error.
-async function requestParse(text: string, canRetry = true): Promise<ReadState> {
-  try {
-    const res = await fetch("/api/parse", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    const data = await res.json();
-    if (res.ok) return { status: "done", result: data.result };
-    if (res.status === 429 && canRetry) {
-      await wait(2000);
-      return requestParse(text, false);
-    }
-    return { status: "failed", error: data.error ?? "Couldn't read this message. Retry or add it by hand." };
-  } catch {
-    if (canRetry) {
-      await wait(2000);
-      return requestParse(text, false);
-    }
-    return { status: "failed", error: "No connection. Check your internet, then retry." };
-  }
-}
-
-export default function Home() {
-  const [state, dispatch] = useReducer(reducer, EMPTY);
-
-  // On first load, bring back any saved work. (localStorage only exists in the browser.)
-  useEffect(() => {
-    dispatch({ type: "restore", saved: loadSaved() });
-  }, []);
-
-  // Save after every change, once the restore above has happened.
-  const { restored, text, messages, reads, fixes, priceTexts } = state;
-  useEffect(() => {
-    if (!restored) return;
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ text, messages, reads, fixes, priceTexts }));
-    } catch {
-      // Private browsing or storage full: the app still works, it just won't remember.
-    }
-  }, [restored, text, messages, reads, fixes, priceTexts]);
-
-  async function readOne(message: ChatMessage) {
-    dispatch({ type: "read", id: message.id, read: { status: "reading" } });
-    dispatch({ type: "read", id: message.id, read: await requestParse(message.text) });
+  function startChange() {
+    setChanging(true);
+    setRole(profile?.role ?? null);
+    setName(profile?.name ?? "");
   }
 
-  async function buildOrder() {
-    let messages = parseChat(state.text);
-    if (messages.length === 0) {
-      const hint = state.text.trim()
-        ? 'Couldn\'t find any messages. Each one should look like "Rahul: 2 pens".'
-        : START_HINT;
-      dispatch({ type: "start", messages, hint });
-      return;
-    }
-    let hint: string | null = null;
-    if (messages.length > MAX_MESSAGES) {
-      hint = `This chat has ${messages.length} messages, so only the latest ${MAX_MESSAGES} are read. To read others, paste just that part of the chat.`;
-      messages = messages.slice(-MAX_MESSAGES);
-    }
-    dispatch({ type: "start", messages, hint });
-
-    // Two messages at a time, each in its own fresh Gemma request.
-    let next = 0;
-    async function worker() {
-      while (next < messages.length) {
-        await readOne(messages[next++]);
-      }
-    }
-    await Promise.all([worker(), worker()]);
-    dispatch({ type: "finish" });
+  function save() {
+    if (!role || !name.trim()) return;
+    saveProfile({ role, name });
+    router.push("/order");
   }
 
-  function startOver() {
-    if (window.confirm("Clear the chat, the order, and all prices?")) dispatch({ type: "reset" });
-  }
-
-  // Everything below is recalculated from the reads: plain code, no AI.
-  const order = useMemo(() => {
-    const results: Record<string, ParseResult> = {};
-    for (const [id, read] of Object.entries(state.reads)) {
-      if (read.status === "done") results[id] = read.result;
-    }
-    return aggregate(state.messages, results, state.fixes);
-  }, [state.messages, state.reads, state.fixes]);
-  const prices = useMemo(() => parsePrices(state.priceTexts), [state.priceTexts]);
-
-  const total = state.messages.length;
-  const finished = Object.values(state.reads).filter((r) => r.status !== "reading").length;
-  const failed = Object.values(state.reads).filter((r) => r.status === "failed").length;
-  let progress: string | null = null;
-  if (state.building) progress = `Reading message ${Math.min(finished + 1, total)} of ${total}.`;
-  else if (total > 0) progress = `Read ${total} messages.` + (failed ? ` ${failed} couldn't be read: retry them below.` : "");
-  const status = [progress, state.hint].filter(Boolean).join(" ") || null;
+  const showPicker = ready && (!profile || changing);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-10">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold">Buy Together</h1>
-          <p className="text-lg">Paste your group chat. Get one clean order.</p>
-        </div>
-        {(state.text || total > 0) && !state.building && (
-          <button type="button" onClick={startOver} className="min-h-11 shrink-0 underline">
-            Start over
+    <main className="mx-auto w-full max-w-2xl px-4 py-10 sm:py-16">
+      <ParchiMark size="lg" />
+      <h1 className="mt-6 text-3xl font-semibold sm:text-4xl">Parchi for everyone</h1>
+      <p className="mt-2 text-lg">
+        Paste a messy chat. Get a clean order, a proper bill, and a community that&apos;s in the loop.
+      </p>
+
+      {ready && profile && !changing && (
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => router.push("/order")} className={PRIMARY_BUTTON}>
+            Continue as {profile.name} ({ROLE_LABEL[profile.role]})
           </button>
-        )}
-      </header>
+          <button type="button" onClick={startChange} className={SECONDARY_BUTTON}>
+            Change
+          </button>
+        </div>
+      )}
 
-      {/* Phone: one column. Laptop: the chat on the left, the notebook on the right. */}
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-6">
-        <div className="flex min-w-0 flex-col gap-4">
-          <PastePanel
-            text={state.text}
-            onTextChange={(text) => dispatch({ type: "setText", text })}
-            onLoadSample={() => dispatch({ type: "setText", text: SAMPLE_CHAT })}
-            onBuild={buildOrder}
-            building={state.building}
-            status={status}
-          />
-          {total > 0 && (
-            <MessageList messages={state.messages} reads={state.reads} order={order} onRetry={readOne} />
+      {showPicker && (
+        <form
+          className="mt-8"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save();
+          }}
+        >
+          <fieldset>
+            <legend className="mb-3 font-semibold">Who are you?</legend>
+            <div className="grid gap-2">
+              {ROLES.map((r) => (
+                <label
+                  key={r}
+                  className={`flex min-h-11 cursor-pointer items-start gap-3 rounded border p-3 ${
+                    role === r ? "border-ink bg-paper" : "border-rule bg-paper/60"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={r}
+                    checked={role === r}
+                    onChange={() => setRole(r)}
+                    className="mt-1.5"
+                  />
+                  <span>
+                    <span className="block font-semibold">{ROLE_LABEL[r]}</span>
+                    <span className="block">{ROLE_PITCH[r]}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {role && (
+            <div className="mt-5">
+              <label htmlFor="profile-name" className="mb-1 block font-semibold">
+                {NAME_LABEL[role]}
+              </label>
+              <input
+                id="profile-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={40}
+                required
+                autoComplete="off"
+                className="w-full rounded border border-rule bg-paper p-3 text-base"
+              />
+              <button type="submit" disabled={!name.trim()} className={`${PRIMARY_BUTTON} mt-4`}>
+                Continue
+              </button>
+            </div>
           )}
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-4">
-          <OrderSheet
-            groups={order.groups}
-            building={state.building}
-            prices={prices}
-            priceTexts={state.priceTexts}
-            onPriceChange={(key, text) => dispatch({ type: "price", key, text })}
-            onFix={(entryId, quantity) => dispatch({ type: "fix", entryId, quantity })}
-          />
-          {order.groups.length > 0 && <Summary groups={order.groups} prices={prices} />}
-        </div>
-      </div>
+        </form>
+      )}
     </main>
   );
 }
