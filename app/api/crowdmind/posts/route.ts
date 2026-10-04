@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { checkPost } from "@/lib/crowdmind/checkPost";
-import type { Post } from "@/lib/crowdmind/schema";
-import { addPost, DEMO_MODE, listPosts } from "@/lib/crowdmind/store";
+import { getStore, type NewPost } from "@/lib/crowdmind/store";
 import { MissingKeyError } from "@/lib/gemma";
 import { canPost, canRead, isRole, ROLE_LABEL, SPACE_LABEL, type Role } from "@/lib/roles";
 
@@ -18,7 +17,7 @@ function forbidden(role: Role, space: Role, action: string) {
 }
 
 // GET ?role=consumer[&space=consumer] → that space's posts, newest first.
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const role = params.get("role");
   const space = params.get("space") ?? role;
@@ -26,7 +25,13 @@ export function GET(request: NextRequest) {
     return Response.json({ error: "Pick a role first." }, { status: 400 });
   }
   if (!canRead(role, space)) return forbidden(role, space, "read");
-  return Response.json({ posts: listPosts(space), demo: DEMO_MODE });
+  const store = getStore();
+  try {
+    return Response.json({ posts: await store.list(space), demo: store.mode === "memory" });
+  } catch (err) {
+    console.error("[api/crowdmind]", err instanceof Error ? err.message : err);
+    return Response.json({ error: "Couldn't load posts right now. Try Refresh." }, { status: 503 });
+  }
 }
 
 // POST { role, name, space, body } → Gemma checks the post → saved, or 422 with a reason.
@@ -69,9 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Save it with Gemma's tag, summary, and prices.
-  const post: Post = {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
+  const draft: NewPost = {
     space,
     authorName: name,
     authorRole: role,
@@ -80,6 +83,13 @@ export async function POST(request: NextRequest) {
     summary: check.summary,
     items: check.items,
   };
-  if (input.dryRun !== true) addPost(post);
-  return Response.json({ post }, { status: 201 });
+  if (input.dryRun === true) {
+    return Response.json({ post: { ...draft, id: "dry-run", createdAt: new Date().toISOString() } }, { status: 201 });
+  }
+  try {
+    return Response.json({ post: await getStore().add(draft) }, { status: 201 });
+  } catch (err) {
+    console.error("[api/crowdmind]", err instanceof Error ? err.message : err);
+    return Response.json({ error: "Couldn't save the post right now. Try again." }, { status: 503 });
+  }
 }
