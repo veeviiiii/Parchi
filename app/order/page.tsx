@@ -273,7 +273,7 @@ function OrderBuilder({ profile }: { profile: Profile }) {
             onPriceChange={(key, text) => dispatch({ type: "price", key, text })}
             onFix={(entryId, quantity) => dispatch({ type: "fix", entryId, quantity })}
           />
-          {order.groups.length > 0 && <Summary groups={order.groups} prices={prices} />}
+          {order.groups.length > 0 && <Summary groups={order.groups} prices={prices} profile={profile} />}
         </div>
       </div>
     </main>

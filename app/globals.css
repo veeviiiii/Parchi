@@ -106,3 +106,15 @@ body {
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
+
+/* Bills print on A4 portrait, on plain white. Headers and buttons use print:hidden. */
+@page {
+  size: A4 portrait;
+  margin: 15mm;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+}

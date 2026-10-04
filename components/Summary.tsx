@@ -1,23 +1,46 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { OrderGroup } from "@/lib/aggregate";
+import { billProblem, buildBill } from "@/lib/bill";
+import { saveBill } from "@/lib/billStore";
 import { copyText, downloadText } from "@/lib/browser";
 import { orderCsv, shopText, whoOwesText } from "@/lib/exports";
 import { formatRupees, grandTotal, whoOwes, type Prices } from "@/lib/money";
+import type { Profile } from "@/lib/profile";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
 
 type Props = {
   groups: OrderGroup[];
   prices: Prices;
+  profile: Profile;
 };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-// Grand total, who owes what, and the copy / download buttons.
-export default function Summary({ groups, prices }: Props) {
+// Grand total, who owes what, the copy / download buttons, and bills.
+export default function Summary({ groups, prices, profile }: Props) {
+  const router = useRouter();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [manualCopy, setManualCopy] = useState<string | null>(null); // shown if copying is blocked
+  const [shopName, setShopName] = useState(""); // optional "From" on consumer and community bills
+  const isMerchant = profile.role === "merchant";
+
+  // Merchant: From = the shop, To = one customer. Others: From = optional shop, To = the profile name.
+  function makeBill(sender?: string) {
+    const bill = buildBill({
+      groups,
+      prices,
+      role: profile.role,
+      from: isMerchant ? profile.name : shopName,
+      to: sender ?? profile.name,
+      sender,
+    });
+    if (saveBill(bill)) router.push(`/bill/${bill.id}`);
+    else setFeedback("Couldn't save the bill in this browser. Check that storage isn't full or blocked.");
+  }
+  const problem = billProblem(groups, prices);
 
   const missingPrice = groups.filter((group) => !(group.key in prices)).length;
   const missingQuantity = groups.filter((group) => group.entries.some((entry) => entry.quantity === null)).length;
@@ -56,13 +79,49 @@ export default function Summary({ groups, prices }: Props) {
 
       <h3 className="mt-4 font-semibold">Who owes what</h3>
       <ul className="mt-1">
-        {whoOwes(groups, prices).map(({ sender, amount }) => (
-          <li key={sender} className="flex justify-between gap-3 border-b border-rule py-1.5 last:border-0">
-            <span className="break-words">{sender}</span>
-            <span className="font-medium">{formatRupees(amount)}</span>
-          </li>
-        ))}
+        {whoOwes(groups, prices).map(({ sender, amount }) => {
+          const customerProblem = isMerchant ? billProblem(groups, prices, sender) : null;
+          return (
+            <li key={sender} className="flex flex-wrap items-center gap-x-3 border-b border-rule py-1.5 last:border-0">
+              <span className="break-words">{sender}</span>
+              <span className="ml-auto font-medium">{formatRupees(amount)}</span>
+              {isMerchant &&
+                (customerProblem ? (
+                  <span className="w-full text-right text-sm">{customerProblem}</span>
+                ) : (
+                  <button type="button" onClick={() => makeBill(sender)} className={SECONDARY_BUTTON}>
+                    Bill
+                  </button>
+                ))}
+            </li>
+          );
+        })}
       </ul>
+
+      {!isMerchant && (
+        <div className="mt-4 border-t border-rule pt-4">
+          <label htmlFor="bill-shop" className="mb-1 block font-semibold">
+            Shop name on the bill (optional)
+          </label>
+          <input
+            id="bill-shop"
+            value={shopName}
+            onChange={(e) => setShopName(e.target.value)}
+            maxLength={40}
+            autoComplete="off"
+            className="w-full rounded border border-rule bg-paper p-2 text-base"
+          />
+          <button
+            type="button"
+            onClick={() => makeBill()}
+            disabled={problem !== null}
+            className={`${PRIMARY_BUTTON} mt-3 w-full sm:w-auto`}
+          >
+            Generate bill
+          </button>
+          {problem && <p className="mt-1 text-sm">{problem}</p>}
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button
