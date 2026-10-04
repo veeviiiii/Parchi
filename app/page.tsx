@@ -74,22 +74,6 @@ const READY_TEXT = "Today's Parchi\n5 × Blue Notebook\n7 × Black Pen\n2 × A4 
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion:reduce)").matches;
 
-function Mural({ className }: { className: string }) {
-  return (
-    <div className={`mural ${className}`} aria-hidden="true">
-      <svg className="mc">
-        <use href="#kc" />
-      </svg>
-      <svg className="mv">
-        <use href="#kv" />
-      </svg>
-      <svg className="mo">
-        <use href="#km" />
-      </svg>
-    </div>
-  );
-}
-
 export default function Landing() {
   const lang = useLanguage();
   const t = (key: keyof typeof EN) => (lang === "hi" ? (HI[key] ?? EN[key]) : EN[key]);
@@ -203,51 +187,6 @@ export default function Landing() {
 
   return (
     <div className="pl">
-      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
-        <defs>
-          <symbol id="kc" viewBox="0 0 240 170">
-            <g fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 156H232" />
-              <rect x="40" y="62" width="150" height="94" fill="currentColor" fillOpacity=".07" />
-              <path d="M32 62L44 36H186L198 62Z" style={{ fill: "var(--ter)", fillOpacity: 0.3 }} />
-              <path d="M32 62q9 12 18 0t18 0 18 0 18 0 18 0 18 0 18 0 18 0 18 0" />
-              <rect x="62" y="12" width="106" height="21" rx="3" />
-              <path d="M52 104H138V112H52M56 84H134M56 96H134" />
-              <circle cx="66" cy="77" r="5" />
-              <circle cx="82" cy="77" r="5" />
-              <rect x="98" y="71" width="10" height="12" />
-              <rect x="116" y="71" width="10" height="12" />
-              <path d="M150 156V100h30v56M158 66v14M168 66v18" />
-              <circle cx="206" cy="148" r="8" />
-              <circle cx="226" cy="148" r="8" />
-              <path d="M206 148l8-22h12" style={{ stroke: "var(--ter)" }} />
-            </g>
-            <text x="115" y="28" textAnchor="middle" fontFamily="Manrope,sans-serif" fontWeight="800" fontSize="13" fill="currentColor">
-              KIRANA
-            </text>
-          </symbol>
-          <symbol id="kv" viewBox="0 0 240 170">
-            <g fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 157q110-3 220 0" />
-              <path d="M36 157V58q84-6 168 0V157" fill="currentColor" fillOpacity=".08" />
-              <path d="M30 58L120 24 210 58" />
-              <rect x="58" y="34" width="124" height="22" rx="2" />
-              <path d="M60 157V100q16-26 32 0V157M60 100h32" />
-              <path d="M118 80h64v34h-64zM118 97h64M150 80v34" />
-              <path d="M196 62v20M204 62v14" strokeDasharray="2 3" />
-            </g>
-            <text x="120" y="49" textAnchor="middle" fontFamily="Manrope,sans-serif" fontWeight="800" fontSize="10" fill="currentColor" letterSpacing="1">
-              GENERAL STORES
-            </text>
-          </symbol>
-          <symbol id="km" viewBox="0 0 240 170">
-            <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square">
-              <path d="M10 156H230M40 156V60H200V156M30 60H210M60 156V96H100V156M120 84H180V120H120ZM120 102H180" />
-              <rect x="56" y="34" width="90" height="16" />
-            </g>
-          </symbol>
-        </defs>
-      </svg>
       <div id="glow" aria-hidden="true" />
 
       <nav aria-label="Main">
@@ -278,7 +217,6 @@ export default function Landing() {
 
       <main id="top">
         <header className="hero" id="hero">
-          <Mural className="m-h" />
           <div className="wrap">
             <h1 aria-label="The Parchi is for everyone.">
               <span>{t("h1a")}</span>
@@ -333,7 +271,6 @@ export default function Landing() {
         </header>
 
         <section id="how">
-          <Mural className="m-how" />
           <div className="wrap">
             <h2>{t("chaos")}</h2>
             <p className="lead">Parchi doesn&apos;t copy messages. It reads them.</p>
@@ -407,13 +344,11 @@ export default function Landing() {
         </section>
 
         <div className="brk">
-          <Mural className="inl" />
           <div className="sgw">
             <p className="sg1">Parchi bana do.</p>
           </div>
         </div>
         <div className="dark">
-          <Mural className="m-d" />
           <div className="wrap rv">
             <h2>
               If Parchi doesn&apos;t know,
@@ -657,7 +592,6 @@ export default function Landing() {
         </section>
 
         <div className="final" id="try">
-          <Mural className="m-f" />
           <span className="bub" style={{ position: "absolute", left: "8%", top: "14%" }}>
             2 blue notebooks 📓
           </span>
