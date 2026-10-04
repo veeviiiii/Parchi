@@ -4,7 +4,7 @@
 
 Buy Together turns a messy group chat full of "mere liye bhi ek le aana" into one grouped shopping list, with prices and who owes what. Gemma 4 reads every message, including Hinglish, vague amounts, and people changing their minds.
 
-**Live demo:** _add the Vercel link here after deploying (see [Deploy on Vercel](#deploy-on-vercel))_
+**Live demo:** https://parchi-self.vercel.app/
 
 <p>
   <img src="docs/messages.jpg" alt="How each message was read: Gemma turns 'bhai 2 copy chahiye single line wali' into Notebook (single line) × 2, ignores 'ok 👍', and reads Rahul's later message as a cancel" width="49%">
