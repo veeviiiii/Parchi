@@ -71,7 +71,7 @@ We tested every prompt change against 10 test messages and the demo chat, severa
 ## AI usage credit
 
 - **At runtime**, the app uses **Gemma 4 (`gemma-4-26b-a4b-it`) via the Gemini API** to read every chat message.
-- **While building**, the code, tests, and this README were written with help from **[Claude Code](https://claude.com/claude-code) (Anthropic)** as a pair programmer, working from the project spec in [`CLAUDE.md`](CLAUDE.md). Commits it helped with are marked `Co-Authored-By: Claude`.
+- **While building**, the code, tests, and this README were written with help from **[Claude Code](https://claude.com/claude-code) (Anthropic)** as a pair programmer, working from the project spec in [`CLAUDE.md`](CLAUDE.md).
 
 ## Setup
 
