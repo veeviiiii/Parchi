@@ -33,7 +33,7 @@ export default function BillPage() {
 
   return (
     <>
-      {profile && <AppHeader profile={profile} />}
+      <AppHeader profile={profile} />
       <main className="mx-auto w-full max-w-3xl px-4 py-6 print:max-w-none print:p-0">
         {!ready && <p>Loading…</p>}
 

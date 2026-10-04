@@ -1,5 +1,5 @@
-// Shared button looks. min-h-11 = 44px, an easy tap on a phone.
+// Shared button looks, matching the design's pill buttons. min-h-12 = 48px, an easy tap on a phone.
 export const PRIMARY_BUTTON =
-  "inline-flex min-h-11 items-center justify-center rounded bg-ink px-4 font-medium text-paper disabled:opacity-50";
+  "inline-flex min-h-12 items-center justify-center rounded-full bg-accent px-6 font-bold text-white disabled:opacity-50";
 export const SECONDARY_BUTTON =
-  "inline-flex min-h-11 items-center justify-center rounded border border-ink bg-paper px-4 disabled:opacity-50";
+  "inline-flex min-h-12 items-center justify-center rounded-full border-[1.5px] border-accent bg-paper px-6 font-bold text-accent disabled:opacity-50";
