@@ -1,10 +1,14 @@
 import { z } from "zod";
 
+// Gemma sometimes writes numbers as text ("2"). Turn those into real numbers before checking.
+export const numberFromText = (value: unknown) =>
+  typeof value === "string" && /^\d+(\.\d+)?$/.test(value.trim()) ? Number(value.trim()) : value;
+
 // The shape Gemma must return for ONE message (CLAUDE.md section 7).
 export const itemSchema = z.object({
   name: z.string().trim().min(1),
   variant: z.string().nullable(),
-  quantity: z.number().int().positive().nullable(),
+  quantity: z.preprocess(numberFromText, z.number().int().positive().nullable()),
   source: z.string(),
 });
 
@@ -19,9 +23,9 @@ export type ParseResult = z.infer<typeof parseResultSchema>;
 
 export const NOT_FOUND_NOTE = "Couldn't find this in the message — please check";
 
-// Turns Gemma's raw text into a validated result.
+// Turns Gemma's raw text into a validated object, for any Gemma job.
 // Returns null if the text isn't valid JSON or doesn't match the schema.
-export function cleanGemmaOutput(raw: string): ParseResult | null {
+export function cleanJson<T>(raw: string, schema: z.ZodType<T>): T | null {
   // 1. Strip ```json fences and trim.
   const text = raw
     .trim()
@@ -37,19 +41,13 @@ export function cleanGemmaOutput(raw: string): ParseResult | null {
     return null;
   }
 
-  // 3. Turn quantities like "2" into 2.
-  if (data && typeof data === "object" && Array.isArray((data as { items?: unknown }).items)) {
-    for (const item of (data as { items: Record<string, unknown>[] }).items) {
-      if (item && typeof item.quantity === "string" && /^\d+$/.test(item.quantity.trim())) {
-        item.quantity = Number(item.quantity.trim());
-      }
-    }
-  }
-
-  // 4. Validate with zod.
-  const parsed = parseResultSchema.safeParse(data);
+  // 3. Validate with zod (which also turns numbers written as text, like "2", into 2).
+  const parsed = schema.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
+
+// The order job: one chat message → ParseResult.
+export const cleanGemmaOutput = (raw: string) => cleanJson(raw, parseResultSchema);
 
 // Checks done in plain code after Gemma answers (CLAUDE.md section 8).
 export function applyGuards(result: ParseResult, message: string): ParseResult {

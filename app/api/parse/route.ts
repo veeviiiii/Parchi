@@ -1,5 +1,6 @@
 import { ApiError } from "@google/genai";
-import { BadReplyError, MissingKeyError, readMessage } from "@/lib/gemma";
+import { BadReplyError, MissingKeyError } from "@/lib/gemma";
+import { readMessage } from "@/lib/readMessage";
 
 // Worst case: 3 attempts of up to 15 s each, plus the waits between them.
 export const maxDuration = 60;

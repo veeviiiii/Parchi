@@ -1,34 +1,7 @@
 // The only file that talks to Gemma. Server-side only: it reads the API key.
-import { ApiError, GoogleGenAI, ThinkingLevel, Type, type Schema } from "@google/genai";
-import { RETRY_HINT, SYSTEM_PROMPT } from "./prompt";
-import { applyGuards, cleanGemmaOutput, type ParseResult } from "./schema";
+import { ApiError, GoogleGenAI, ThinkingLevel, type Schema } from "@google/genai";
 
 export const GEMMA_MODEL = process.env.GEMMA_MODEL || "gemma-4-26b-a4b-it";
-
-// Same shape as lib/schema.ts, written in the format the Gemini API expects.
-const RESPONSE_SCHEMA: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    intent: { type: Type.STRING, enum: ["add", "cancel", "not_an_order"] },
-    items: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          variant: { type: Type.STRING, nullable: true },
-          quantity: { type: Type.INTEGER, nullable: true },
-          source: { type: Type.STRING },
-        },
-        required: ["name", "variant", "quantity", "source"],
-        propertyOrdering: ["name", "variant", "quantity", "source"],
-      },
-    },
-    unclear: { type: Type.ARRAY, items: { type: Type.STRING } },
-  },
-  required: ["intent", "items", "unclear"],
-  propertyOrdering: ["intent", "items", "unclear"],
-};
 
 export class MissingKeyError extends Error {
   constructor() {
@@ -70,19 +43,19 @@ const THINKING = { thinkingLevel: ThinkingLevel.MINIMAL };
 // model. Then the prompt is sent inside the message instead (CLAUDE.md section 8).
 let structuredOutput = true;
 
-// One fresh request per message: no chat history, ever.
-async function askGemma(message: string, hint?: string): Promise<string> {
-  const content = `Message: ${message}` + (hint ? `\n\n${hint}` : "");
+type Ask = { system: string; responseSchema: Schema; content: string };
 
+// One fresh request: the system prompt plus one piece of text. No chat history, ever.
+export async function askGemma({ system, responseSchema, content }: Ask): Promise<string> {
   if (structuredOutput) {
     try {
       const response = await getClient().models.generateContent({
         model: GEMMA_MODEL,
         contents: content,
         config: {
-          systemInstruction: SYSTEM_PROMPT,
+          systemInstruction: system,
           responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
+          responseSchema,
           temperature: 0.2,
           thinkingConfig: THINKING,
         },
@@ -96,7 +69,7 @@ async function askGemma(message: string, hint?: string): Promise<string> {
 
   const response = await getClient().models.generateContent({
     model: GEMMA_MODEL,
-    contents: `${SYSTEM_PROMPT}\n\n${content}`,
+    contents: `${system}\n\n${content}`,
     config: { temperature: 0.2, thinkingConfig: THINKING },
   });
   if (structuredOutput) {
@@ -104,14 +77,4 @@ async function askGemma(message: string, hint?: string): Promise<string> {
     structuredOutput = false;
   }
   return response.text ?? "";
-}
-
-// Reads one chat message and returns what the sender wants.
-export async function readMessage(message: string): Promise<ParseResult> {
-  let result = cleanGemmaOutput(await askGemma(message));
-  if (!result) {
-    result = cleanGemmaOutput(await askGemma(message, RETRY_HINT));
-  }
-  if (!result) throw new BadReplyError();
-  return applyGuards(result, message);
 }

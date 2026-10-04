@@ -42,5 +42,3 @@ JSON: {"intent":"cancel","items":[{"name":"scale","variant":null,"quantity":null
 
 Message: thanks yaar
 JSON: {"intent":"not_an_order","items":[],"unclear":[]}`;
-
-export const RETRY_HINT = "Return only valid JSON matching the schema.";
